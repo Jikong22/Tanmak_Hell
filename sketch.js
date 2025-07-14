@@ -33,16 +33,67 @@ let nameInput;
 let gameCanvas;
 let finalSurvivalTime = 0;
 
+//게임 사운드 관련
+let lobbyBGM, gameBGM, hitSFX;
+
+// 게임 사운드 음량 조절
+let lobbySlider, gameSlider, sfxSlider;
+let lobbyLabel, gameLabel, sfxLabel;
+
+function preload() {
+  lobbyBGM = loadSound('assets/lobby_bgm.mp3');
+  gameBGM = loadSound('assets/game_bgm.mp3');
+  hitSFX = loadSound('assets/hit_sound.mp3');
+}
+
 function setup() {
-  gameCanvas = createCanvas(1600, 600);
+  gameCanvas = createCanvas(1500, 650);
   player = createVector(width / 2, height - 50);
   frameRate(60);
   nameInput = createInput('').attribute('placeholder', '이름을 입력하세요');
   nameInput.hide();
+
+  // 로비 슬라이더와 라벨
+  lobbyLabel = createDiv("로비 BGM");
+  lobbyLabel.position(20, 20);
+  lobbySlider = createSlider(0, 1, 0.5, 0.01);
+  lobbySlider.position(100, 20);
+  lobbySlider.style('width', '150px');
+
+  // 게임 슬라이더와 라벨
+  gameLabel = createDiv("게임 BGM");
+  gameLabel.position(20, 50);
+  gameSlider = createSlider(0, 1, 0.5, 0.01);
+  gameSlider.position(100, 50);
+  gameSlider.style('width', '150px');
+
+  // 효과음 슬라이더와 라벨
+  sfxLabel = createDiv("효과음");
+  sfxLabel.position(20, 80);
+  sfxSlider = createSlider(0, 1, 1.0, 0.01);
+  sfxSlider.position(100, 80);
+  sfxSlider.style('width', '150px');
 }
 
 function draw() {
   background(0);
+
+// 실시간 볼륨 적용
+lobbyBGM.setVolume(lobbySlider.value());
+gameBGM.setVolume(gameSlider.value());
+hitSFX.setVolume(sfxSlider.value());
+
+   if (gameState === 'playing') {
+    if (!gameBGM.isPlaying()) {
+      lobbyBGM.stop();
+      gameBGM.loop();
+    }
+  } else {
+    if (!lobbyBGM.isPlaying()) {
+      gameBGM.stop();
+      lobbyBGM.loop();
+    }
+  }
 
   if (gameState === 'start') {
     drawStartScreen();
@@ -142,7 +193,7 @@ function handleBarragePattern() {
   // 프레임당 평균 1.2발 (기존 2발에서 40% 감소)을 발사합니다.
   // 2번의 발사 기회에서 각각 60% 확률로 발사합니다.
   for (let i = 0; i < 2; i++) {
-    if (random() < 0.6) { // 60% 확률로 발사
+    if (random() < 0.4) { // 40% 확률로 발사
       // 발사 각도를 40도로 줄임 (PI/9 라디안 = 20도)
       let angle = barrageBaseAngle + random(-PI / 9, PI / 9);
       let speed = (random(3.5, 5) + difficultyMultiplier * 0.2) * 0.8;
@@ -220,6 +271,7 @@ function checkCollisions() {
     let bulletRadius = 5; // 기본 총알 반지름
     if (b.type === 'wave') bulletRadius = 6;
     if (dist(b.x, b.y, player.x, player.y) < playerRadius + bulletRadius) {
+      hitSFX.play(); // 피격 효과음 재생
       health--;
       invincible = true;
       invincibilityTimer = 120;
@@ -252,11 +304,7 @@ function drawUI() {
   // 생존 시간 표시
   textSize(20); // 생존 시간 텍스트 크기
   let t = gameState === 'playing' ? ((millis() - startTime) / 1000).toFixed(1) : '0.0';
-  text(`생존 시간: ${t}초`, 10, 60);
-
-  textAlign(RIGHT);
-  text(playerName, width - 10, 30);
-  textAlign(LEFT);
+  text(`${playerName}님의 생존 시간: ${t}초`, 10, 60);
 }
 
 // 일반 탄막 패턴 생성
@@ -373,7 +421,7 @@ function saveScore(name, score) {
   let finalName = name;
   if (scores.some(s => s.name === name)) {
     let counter = 1;
-    while (scores.some(s => s.name === `${name} (${counter})`)) {
+    while (scores.some(s => s.name === `${name}(${counter})`)) {
       counter++;
     }
     finalName = `${name} (${counter})`;
@@ -387,8 +435,8 @@ function saveScore(name, score) {
 
 // 아이템 업데이트
 function updateItems() {
-  // 회복 아이템 등장 확률을 낮춤 (0.5% -> 0.1%)
-  if (random() < 0.001) {
+  // 회복 아이템 등장 확률을 낮춤 (0.5% -> 0.13%)
+  if (random() < 0.0013) {
     items.push({ x: random(50, width - 50), y: -10, speed: 2, type: "heal" });
   }
   for (let i of items) {
@@ -698,7 +746,7 @@ function drawRulesScreen() {
   let textX = width / 2 - 250;
   let textY = 180;
   text("■ 목표", textX, textY);
-  text("   - 쏟아지는 총알을 피해 최대한 오래 생존하세요.", textX, textY + 40);
+  text("   - 쏟아지는 총알을 피해 100초 동안 생존하여 상품을 얻으세요.", textX, textY + 40);
   text("■ 조작", textX, textY + 100);
   text("   - 이동: WASD 또는 방향키 (←↑→↓)", textX, textY + 140);
   text("■ 아이템", textX, textY + 200);
@@ -820,8 +868,12 @@ function mousePressed() {
     let resetButtonW = 150;
     let resetButtonH = 50;
     if (mouseX > resetButtonX && mouseX < resetButtonX + resetButtonW && mouseY > resetButtonY && mouseY < resetButtonY + resetButtonH) {
-      if (confirm("스코어보드를 정말 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.")) {
+      const password = prompt("스코어보드를 초기화하려면 비밀번호를 입력하세요.");
+      if (password === "reset1234") { // 비밀번호: reset1234
         localStorage.removeItem('tanmakScores');
+        alert("스코어보드가 초기화되었습니다.");
+      } else if (password !== null) { // 사용자가 비밀번호를 입력했지만 틀렸을 경우
+        alert("비밀번호가 틀렸습니다.");
       }
     }
   } else if (gameState === 'rules') {
