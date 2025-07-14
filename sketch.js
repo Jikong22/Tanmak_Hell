@@ -34,7 +34,8 @@ let gameCanvas;
 let finalSurvivalTime = 0;
 
 //게임 사운드 관련
-let lobbyBGM, gameBGM, hitSFX;
+let lobbyBGM, gameBGM;
+let sfx = {}; // 효과음들을 그룹으로 묶어 관리
 
 // 게임 사운드 음량 조절
 let lobbySlider, gameSlider, sfxSlider;
@@ -43,7 +44,9 @@ let lobbyLabel, gameLabel, sfxLabel;
 function preload() {
   lobbyBGM = loadSound('assets/lobby_bgm.mp3');
   gameBGM = loadSound('assets/game_bgm.mp3');
-  hitSFX = loadSound('assets/hit_sound.mp3');
+  sfx.hit = loadSound('assets/hit_sound.mp3');
+  sfx.gameOver = loadSound('assets/gameover_sound.mp3');
+  sfx.heal = loadSound('assets/heal_sound.mp3');
 }
 
 function setup() {
@@ -81,14 +84,16 @@ function draw() {
 // 실시간 볼륨 적용
 lobbyBGM.setVolume(lobbySlider.value());
 gameBGM.setVolume(gameSlider.value());
-hitSFX.setVolume(sfxSlider.value());
-
+let sfxVolume = sfxSlider.value();
+for (let key in sfx) {
+  sfx[key].setVolume(sfxVolume);
+}
    if (gameState === 'playing') {
     if (!gameBGM.isPlaying()) {
       lobbyBGM.stop();
       gameBGM.loop();
     }
-  } else {
+  } else if (gameState !== 'gameOver') { // 시작, 스코어보드, 규칙 화면
     if (!lobbyBGM.isPlaying()) {
       gameBGM.stop();
       lobbyBGM.loop();
@@ -271,11 +276,13 @@ function checkCollisions() {
     let bulletRadius = 5; // 기본 총알 반지름
     if (b.type === 'wave') bulletRadius = 6;
     if (dist(b.x, b.y, player.x, player.y) < playerRadius + bulletRadius) {
-      hitSFX.play(); // 피격 효과음 재생
+      sfx.hit.play(); // 피격 효과음 재생
       health--;
       invincible = true;
       invincibilityTimer = 120;
       if (health <= 0) {
+        gameBGM.stop();
+        sfx.gameOver.play();
         gameState = 'gameOver';
         finalSurvivalTime = parseFloat(((millis() - startTime) / 1000).toFixed(1));
         saveScore(playerName, finalSurvivalTime);
@@ -457,7 +464,10 @@ function drawItems() {
 function checkItemCollisions() {
   for (let i = items.length - 1; i >= 0; i--) {
     if (dist(items[i].x, items[i].y, player.x, player.y) < 15) {
-      if (items[i].type === "heal" && health < maxHealth) health++;
+      if (items[i].type === "heal" && health < maxHealth) {
+        health++;
+        sfx.heal.play();
+      }
       items.splice(i, 1);
     }
   }
