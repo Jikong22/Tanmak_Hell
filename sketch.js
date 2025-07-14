@@ -478,7 +478,7 @@ function drawStartScreen() {
   fill(255, 0, 0);
   textAlign(CENTER, CENTER);
   textSize(100);
-  text("탄막지옥", width / 2, height / 2 - 150);
+  text("회피본능", width / 2, height / 2 - 150);
 
   // HTML 이름 입력창 표시 및 위치 설정
   nameInput.show();
